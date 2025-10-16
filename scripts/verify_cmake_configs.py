@@ -24,17 +24,49 @@ changing the base build directory.  See ``--help`` for details.
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Set, Tuple
+
+GENERATOR_TOOL_HINTS = {
+    "Ninja": "ninja",
+    "Unix Makefiles": "make",
+}
 
 
 def list_configs(config_root: Path, selection: Iterable[str] | None) -> List[str]:
     if selection:
         return list(selection)
     return sorted(p.name for p in config_root.iterdir() if p.is_file())
+
+
+def query_available_generators() -> Set[str]:
+    """Return the set of generators that the local CMake installation supports."""
+
+    try:
+        completed = subprocess.run(
+            ["cmake", "-E", "capabilities"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        # Either CMake is missing entirely or the capabilities command failed.
+        # In both cases we simply return an empty set so the caller can decide
+        # how to proceed without crashing.
+        return set()
+
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return set()
+
+    generators = payload.get("generators") or []
+    return {entry.get("name", "") for entry in generators if entry.get("name")}
 
 
 def configure_config(source_dir: Path, build_root: Path, config: str, generator: str | None) -> Tuple[bool, str]:
@@ -93,6 +125,25 @@ def main(argv: List[str]) -> int:
     )
 
     args = parser.parse_args(argv)
+
+    if args.generator:
+        generators = query_available_generators()
+        if generators and args.generator not in generators:
+            parser.error(
+                "Requested CMake generator '{gen}' is not available. Install the matching build "
+                "tool or omit --generator to let CMake choose a default.\n"
+                "Available generators: {available}".format(
+                    gen=args.generator, available=", ".join(sorted(generators)) or "unknown"
+                )
+            )
+        tool_hint = GENERATOR_TOOL_HINTS.get(args.generator)
+        if tool_hint and shutil.which(tool_hint) is None:
+            parser.error(
+                "Requested CMake generator '{gen}' requires the '{tool}' executable, which was "
+                "not found in PATH. Install it or omit --generator to use the default.".format(
+                    gen=args.generator, tool=tool_hint
+                )
+            )
 
     source_dir = args.source_dir.resolve()
     config_root = (args.config_root or (source_dir / "config")).resolve()

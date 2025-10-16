@@ -45,7 +45,9 @@ invokes CMake for each file, mirroring the manual verification process.  When
 cross toolchains are not present locally (for example the VxWorks or Yocto
 SDKs referenced by the makefiles) the script surfaces the missing compiler or
 environment variables in its summary so the required vendor packages can be
-installed before attempting a full build.
+installed before attempting a full build.  If you pass `--generator`, ensure
+that the corresponding build tool is installed; otherwise omit the option and
+let CMake fall back to its default generator.
 
 The default configuration mirrors the Linux make configuration: it enables
 message data support and the optional XML/directory modules, links against
