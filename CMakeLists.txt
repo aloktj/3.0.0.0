@@ -260,10 +260,99 @@ if(RT_LIBRARY)
     target_link_libraries(trdp PUBLIC ${RT_LIBRARY})
 endif()
 
-find_library(UUID_LIBRARY uuid)
-if(UUID_LIBRARY)
-    target_link_libraries(trdp PUBLIC ${UUID_LIBRARY})
-    target_compile_definitions(trdp PUBLIC HAS_UUID)
+set(_uuid_required FALSE)
+set(_uuid_definition_index -1)
+if(TRDP_CONFIG_COMPILE_DEFINITIONS)
+    list(FIND TRDP_CONFIG_COMPILE_DEFINITIONS "HAS_UUID" _uuid_definition_index)
+    if(NOT _uuid_definition_index EQUAL -1)
+        set(_uuid_required TRUE)
+    endif()
+endif()
+
+if(NOT DEFINED TRDP_CONFIG_LOADED OR NOT TRDP_CONFIG_LOADED)
+    set(_uuid_required TRUE)
+endif()
+
+if(_uuid_required)
+    set(_uuid_header_found FALSE)
+    set(_uuid_include_dir "")
+
+    if(TRDP_CONFIG_INCLUDE_DIRS)
+        foreach(_inc IN LISTS TRDP_CONFIG_INCLUDE_DIRS)
+            if(EXISTS "${_inc}/uuid/uuid.h")
+                set(_uuid_header_found TRUE)
+                set(_uuid_include_dir "${_inc}")
+                break()
+            elseif(EXISTS "${_inc}/uuid.h")
+                set(_uuid_header_found TRUE)
+                set(_uuid_include_dir "${_inc}")
+                break()
+            endif()
+        endforeach()
+    endif()
+
+    if(NOT _uuid_header_found AND (NOT TRDP_CONFIG_LOADED OR NOT TRDP_CONFIG_IS_CROSS))
+        find_path(UUID_INCLUDE_DIR NAMES uuid/uuid.h)
+        if(UUID_INCLUDE_DIR)
+            set(_uuid_header_found TRUE)
+            set(_uuid_include_dir "${UUID_INCLUDE_DIR}")
+        endif()
+    endif()
+
+    if(NOT _uuid_header_found)
+        if(TRDP_CONFIG)
+            message(
+                FATAL_ERROR
+                "TRDP config '${TRDP_CONFIG}' enables HAS_UUID but 'uuid/uuid.h' was not found. "
+                "Install the uuid development headers or extend INCPATH to point to the "
+                "correct sysroot before configuring CMake."
+            )
+        else()
+            message(FATAL_ERROR "uuid/uuid.h could not be located; install the uuid development headers.")
+        endif()
+    endif()
+
+    if(NOT _uuid_include_dir STREQUAL "")
+        set(_needs_uuid_include TRUE)
+        if(TRDP_CONFIG_INCLUDE_DIRS)
+            list(FIND TRDP_CONFIG_INCLUDE_DIRS "${_uuid_include_dir}" _uuid_include_index)
+            if(NOT _uuid_include_index EQUAL -1)
+                set(_needs_uuid_include FALSE)
+            endif()
+        endif()
+        if(_needs_uuid_include)
+            target_include_directories(trdp PUBLIC ${_uuid_include_dir})
+        endif()
+    endif()
+
+    set(_uuid_library_provided FALSE)
+    if(TRDP_CONFIG_LINK_LIBRARIES)
+        list(FIND TRDP_CONFIG_LINK_LIBRARIES "uuid" _uuid_library_index)
+        if(NOT _uuid_library_index EQUAL -1)
+            set(_uuid_library_provided TRUE)
+        endif()
+    endif()
+
+    if(NOT _uuid_library_provided)
+        find_library(UUID_LIBRARY NAMES uuid)
+        if(NOT UUID_LIBRARY)
+            if(TRDP_CONFIG)
+                message(
+                    FATAL_ERROR
+                    "TRDP config '${TRDP_CONFIG}' enables HAS_UUID but libuuid could not be located. "
+                    "Install the uuid development package or extend LDFLAGS/ADD_LIBPATH with the "
+                    "correct sysroot library directory."
+                )
+            else()
+                message(FATAL_ERROR "libuuid could not be located; install the uuid development package.")
+            endif()
+        endif()
+        target_link_libraries(trdp PUBLIC ${UUID_LIBRARY})
+    endif()
+
+    if(_uuid_definition_index EQUAL -1)
+        target_compile_definitions(trdp PUBLIC HAS_UUID)
+    endif()
 endif()
 
 set(_trdp_public_compile_definitions ${TRDP_TARGET_OS})

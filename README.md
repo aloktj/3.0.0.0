@@ -49,6 +49,14 @@ installed before attempting a full build.  If you pass `--generator`, ensure
 that the corresponding build tool is installed; otherwise omit the option and
 let CMake fall back to its default generator.
 
+Some presets, such as `RASPIAN_config`, expect the system (or sysroot) to
+provide libuuid headers and libraries because they enable the service-oriented
+API via `HAS_UUID`.  When CMake loads such a preset it now verifies that
+`uuid/uuid.h` and the matching library are reachable through the configured
+include and library paths.  Install the corresponding development package (for
+example `uuid-dev` on Debian-based distributions) or adjust `INCPATH`/`LDFLAGS`
+before configuring if the check fails.
+
 The default configuration mirrors the Linux make configuration: it enables
 message data support and the optional XML/directory modules, links against
 `pthread`, `rt` and `uuid`, and builds the example as well as test utilities.
