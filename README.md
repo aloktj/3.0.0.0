@@ -39,6 +39,14 @@ seeds the default option values (MD, TSN, SOA, high-performance indexing,
 PD unicast, etc.) and maps the build outputs into the same
 `bld/output/<arch>-<variant>` layout that the Makefiles use.
 
+To check a CMake configuration against every legacy preset, run
+`scripts/verify_cmake_configs.py`.  The helper walks through `config/` and
+invokes CMake for each file, mirroring the manual verification process.  When
+cross toolchains are not present locally (for example the VxWorks or Yocto
+SDKs referenced by the makefiles) the script surfaces the missing compiler or
+environment variables in its summary so the required vendor packages can be
+installed before attempting a full build.
+
 The default configuration mirrors the Linux make configuration: it enables
 message data support and the optional XML/directory modules, links against
 `pthread`, `rt` and `uuid`, and builds the example as well as test utilities.
