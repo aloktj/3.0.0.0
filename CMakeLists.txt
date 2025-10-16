@@ -1,27 +1,179 @@
 cmake_minimum_required(VERSION 3.16)
+
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(TrdpConfigLoader)
+
+set(TRDP_CONFIG "" CACHE STRING "Name of a legacy make configuration file from config/ used to seed the CMake build")
+
+if(TRDP_CONFIG)
+    if(NOT COMMAND trdp_load_make_config)
+        message(FATAL_ERROR "TrdpConfigLoader.cmake must be available to load legacy configs")
+    endif()
+    trdp_load_make_config("${TRDP_CONFIG}")
+endif()
+
+if(TRDP_CONFIG_LOADED)
+    if(TRDP_CONFIG_SYSTEM_NAME_HINT AND NOT CMAKE_SYSTEM_NAME)
+        set(CMAKE_SYSTEM_NAME "${TRDP_CONFIG_SYSTEM_NAME_HINT}")
+    endif()
+    if(TRDP_CONFIG_IS_CROSS)
+        set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+    endif()
+    if(TRDP_CONFIG_COMPILER AND NOT CMAKE_C_COMPILER)
+        set(CMAKE_C_COMPILER "${TRDP_CONFIG_COMPILER}" CACHE FILEPATH "C compiler inferred from ${TRDP_CONFIG}" FORCE)
+    endif()
+    if(TRDP_CONFIG_AR AND NOT CMAKE_AR)
+        set(CMAKE_AR "${TRDP_CONFIG_AR}" CACHE FILEPATH "Archiver inferred from ${TRDP_CONFIG}" FORCE)
+    endif()
+    if(TRDP_CONFIG_RANLIB AND NOT CMAKE_RANLIB)
+        set(CMAKE_RANLIB "${TRDP_CONFIG_RANLIB}" CACHE FILEPATH "Ranlib inferred from ${TRDP_CONFIG}" FORCE)
+    endif()
+endif()
+
+set(_trdp_target_os_default "LINUX")
+if(DEFINED TRDP_CONFIG_TARGET_OS AND NOT TRDP_CONFIG_TARGET_OS STREQUAL "")
+    set(_trdp_target_os_default "${TRDP_CONFIG_TARGET_OS}")
+endif()
+
+set(_trdp_vos_default "posix")
+if(DEFINED TRDP_CONFIG_TARGET_VOS AND NOT TRDP_CONFIG_TARGET_VOS STREQUAL "")
+    set(_trdp_vos_default "${TRDP_CONFIG_TARGET_VOS}")
+endif()
+
 project(TRDP VERSION 3.0.0.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(TRDP_ENABLE_MD "Enable message data support" ON)
+set(_trdp_md_default ON)
+if(DEFINED TRDP_CONFIG_MD_SUPPORT AND NOT TRDP_CONFIG_MD_SUPPORT STREQUAL "")
+    if(TRDP_CONFIG_MD_SUPPORT STREQUAL "0")
+        set(_trdp_md_default OFF)
+    else()
+        set(_trdp_md_default ON)
+    endif()
+endif()
+
+set(_trdp_tsn_default OFF)
+if(DEFINED TRDP_CONFIG_TSN_SUPPORT AND NOT TRDP_CONFIG_TSN_SUPPORT STREQUAL "")
+    if(TRDP_CONFIG_TSN_SUPPORT STREQUAL "0")
+        set(_trdp_tsn_default OFF)
+    else()
+        set(_trdp_tsn_default ON)
+    endif()
+endif()
+
+set(_trdp_soa_default OFF)
+if(DEFINED TRDP_CONFIG_SOA_SUPPORT AND NOT TRDP_CONFIG_SOA_SUPPORT STREQUAL "")
+    if(TRDP_CONFIG_SOA_SUPPORT STREQUAL "0")
+        set(_trdp_soa_default OFF)
+    else()
+        set(_trdp_soa_default ON)
+    endif()
+endif()
+
+set(_trdp_high_perf_default OFF)
+if(DEFINED TRDP_CONFIG_HIGH_PERF_SUPPORT AND NOT TRDP_CONFIG_HIGH_PERF_SUPPORT STREQUAL "")
+    if(TRDP_CONFIG_HIGH_PERF_SUPPORT STREQUAL "0")
+        set(_trdp_high_perf_default OFF)
+    else()
+        set(_trdp_high_perf_default ON)
+    endif()
+endif()
+
+set(_trdp_high_perf_base2_default OFF)
+if(DEFINED TRDP_CONFIG_HIGH_PERF_BASE2 AND NOT TRDP_CONFIG_HIGH_PERF_BASE2 STREQUAL "")
+    if(TRDP_CONFIG_HIGH_PERF_BASE2 STREQUAL "0")
+        set(_trdp_high_perf_base2_default OFF)
+    else()
+        set(_trdp_high_perf_base2_default ON)
+    endif()
+elseif(_trdp_high_perf_default)
+    set(_trdp_high_perf_base2_default ON)
+endif()
+
+set(_trdp_pd_unicast_default OFF)
+if(DEFINED TRDP_CONFIG_PD_UNICAST_SUPPORT AND NOT TRDP_CONFIG_PD_UNICAST_SUPPORT STREQUAL "")
+    if(TRDP_CONFIG_PD_UNICAST_SUPPORT STREQUAL "0")
+        set(_trdp_pd_unicast_default OFF)
+    else()
+        set(_trdp_pd_unicast_default ON)
+    endif()
+endif()
+
+set(_trdp_build_tsn_apps_default OFF)
+if(_trdp_tsn_default)
+    set(_trdp_build_tsn_apps_default ON)
+endif()
+
+option(TRDP_ENABLE_MD "Enable message data support" ${_trdp_md_default})
 option(TRDP_ENABLE_XML "Enable XML parsing, marshalling and directory services" ON)
-option(TRDP_ENABLE_TSN "Enable TSN socket support" OFF)
-option(TRDP_ENABLE_SOA "Enable service oriented architecture support" OFF)
-option(TRDP_ENABLE_HIGH_PERF "Enable high performance indexed dataset support" OFF)
-option(TRDP_ENABLE_PD_UNICAST "Enable PD unicast support" OFF)
+option(TRDP_ENABLE_TSN "Enable TSN socket support" ${_trdp_tsn_default})
+option(TRDP_ENABLE_SOA "Enable service oriented architecture support" ${_trdp_soa_default})
+option(TRDP_ENABLE_HIGH_PERF "Enable high performance indexed dataset support" ${_trdp_high_perf_default})
+option(TRDP_ENABLE_HIGH_PERF_BASE2 "Use base 2 indexing for high performance datasets" ${_trdp_high_perf_base2_default})
+option(TRDP_ENABLE_PD_UNICAST "Enable PD unicast support" ${_trdp_pd_unicast_default})
 
 option(TRDP_BUILD_EXAMPLES "Build TRDP example applications" ON)
 option(TRDP_BUILD_TEST_APPS "Build TRDP test utilities" ON)
 option(TRDP_BUILD_XML_APPS "Build XML based utilities" ON)
 option(TRDP_BUILD_VLAN_APPS "Build VLAN test utilities" ON)
 option(TRDP_BUILD_MARSHALLING_APP "Build marshalling regression utility" ON)
-option(TRDP_BUILD_TSN_APPS "Build TSN demo utilities" OFF)
+option(TRDP_BUILD_TSN_APPS "Build TSN demo utilities" ${_trdp_build_tsn_apps_default})
 
-set(TRDP_TARGET_OS "LINUX" CACHE STRING "Value passed via -D<OS> compile definition")
-set(TRDP_VOS_IMPLEMENTATION "posix" CACHE STRING "Name of the VOS implementation directory")
+if(TRDP_CONFIG_COMPILE_OPTIONS)
+    add_compile_options(${TRDP_CONFIG_COMPILE_OPTIONS})
+endif()
+
+if(TRDP_CONFIG_COMPILE_DEFINITIONS)
+    add_compile_definitions(${TRDP_CONFIG_COMPILE_DEFINITIONS})
+endif()
+
+if(TRDP_CONFIG_RT_THREADS AND NOT TRDP_CONFIG_RT_THREADS STREQUAL "" AND NOT TRDP_CONFIG_RT_THREADS STREQUAL "0")
+    add_compile_definitions(RT_THREADS)
+endif()
+
+set(TRDP_TARGET_OS "${_trdp_target_os_default}" CACHE STRING "Value passed via -D<OS> compile definition")
+set(TRDP_VOS_IMPLEMENTATION "${_trdp_vos_default}" CACHE STRING "Name of the VOS implementation directory")
 set_property(CACHE TRDP_VOS_IMPLEMENTATION PROPERTY STRINGS posix)
+
+set(_trdp_output_arch "${TRDP_CONFIG_ARCH}")
+if(NOT _trdp_output_arch OR _trdp_output_arch STREQUAL "unknown")
+    if(CMAKE_SYSTEM_PROCESSOR)
+        string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _trdp_output_arch)
+    else()
+        set(_trdp_output_arch "unknown")
+    endif()
+endif()
+
+set(_trdp_output_root "${CMAKE_SOURCE_DIR}/bld/output/${_trdp_output_arch}")
+
+if(CMAKE_CONFIGURATION_TYPES)
+    foreach(_cfg ${CMAKE_CONFIGURATION_TYPES})
+        string(TOLOWER "${_cfg}" _trdp_cfg_lower)
+        if(_trdp_cfg_lower STREQUAL "debug")
+            set(_trdp_suffix "dbg")
+        else()
+            set(_trdp_suffix "rel")
+        endif()
+        set(_trdp_cfg_dir "${_trdp_output_root}-${_trdp_suffix}")
+        set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${_trdp_cfg_dir}")
+        set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${_trdp_cfg_dir}")
+        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${_trdp_cfg_dir}")
+    endforeach()
+else()
+    string(TOLOWER "${CMAKE_BUILD_TYPE}" _trdp_build_type)
+    if(_trdp_build_type STREQUAL "debug")
+        set(_trdp_suffix "dbg")
+    else()
+        set(_trdp_suffix "rel")
+    endif()
+    set(_trdp_cfg_dir "${_trdp_output_root}-${_trdp_suffix}")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_trdp_cfg_dir}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_trdp_cfg_dir}")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_trdp_cfg_dir}")
+endif()
 
 set(TRDP_COMMON_SOURCES
     src/common/trdp_pdcom.c
@@ -85,7 +237,20 @@ target_include_directories(trdp
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/vos/api>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/vos/common>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/vos/${TRDP_VOS_IMPLEMENTATION}>
+        ${TRDP_CONFIG_INCLUDE_DIRS}
 )
+
+if(TRDP_CONFIG_LINK_DIRECTORIES)
+    target_link_directories(trdp PUBLIC ${TRDP_CONFIG_LINK_DIRECTORIES})
+endif()
+
+if(TRDP_CONFIG_LINK_OPTIONS)
+    target_link_options(trdp PUBLIC ${TRDP_CONFIG_LINK_OPTIONS})
+endif()
+
+if(TRDP_CONFIG_LINK_LIBRARIES)
+    target_link_libraries(trdp PUBLIC ${TRDP_CONFIG_LINK_LIBRARIES})
+endif()
 
 find_package(Threads REQUIRED)
 target_link_libraries(trdp PUBLIC Threads::Threads)
@@ -101,13 +266,27 @@ if(UUID_LIBRARY)
     target_compile_definitions(trdp PUBLIC HAS_UUID)
 endif()
 
-target_compile_definitions(trdp
-    PUBLIC
-        ${TRDP_TARGET_OS}
-        POSIX
-        _GNU_SOURCE
-        L_ENDIAN
-)
+set(_trdp_public_compile_definitions ${TRDP_TARGET_OS})
+
+if(TRDP_CONFIG_COMPILE_DEFINITIONS)
+    foreach(_def IN LISTS TRDP_CONFIG_COMPILE_DEFINITIONS)
+        list(FIND _trdp_public_compile_definitions "${_def}" _def_index)
+        if(_def_index EQUAL -1)
+            list(APPEND _trdp_public_compile_definitions "${_def}")
+        endif()
+    endforeach()
+endif()
+
+foreach(_fallback_def POSIX _GNU_SOURCE L_ENDIAN)
+    list(FIND _trdp_public_compile_definitions "${_fallback_def}" _fallback_index)
+    if(_fallback_index EQUAL -1)
+        list(APPEND _trdp_public_compile_definitions "${_fallback_def}")
+    endif()
+endforeach()
+
+list(REMOVE_ITEM _trdp_public_compile_definitions "")
+
+target_compile_definitions(trdp PUBLIC ${_trdp_public_compile_definitions})
 
 if(TRDP_ENABLE_MD)
     target_compile_definitions(trdp PUBLIC MD_SUPPORT=1)
@@ -128,7 +307,10 @@ if(TRDP_ENABLE_PD_UNICAST)
 endif()
 
 if(TRDP_ENABLE_HIGH_PERF)
-    target_compile_definitions(trdp PUBLIC HIGH_PERF_INDEXED HIGH_PERF_BASE2)
+    target_compile_definitions(trdp PUBLIC HIGH_PERF_INDEXED)
+    if(TRDP_ENABLE_HIGH_PERF_BASE2)
+        target_compile_definitions(trdp PUBLIC HIGH_PERF_BASE2)
+    endif()
 endif()
 
 target_compile_options(trdp
